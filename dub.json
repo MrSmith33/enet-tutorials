@@ -1,0 +1,17 @@
+{
+    "name": "enet-test",
+    "description": "ENet test",
+    "license": "Boost",
+    "authors": [
+        "MrSmith33"
+    ],
+
+    "mainSourceFile": "main.d",
+    "sourceFiles" : ["main.d"],
+    "targetType" : "executable",
+
+    "dependencies": {
+        "derelict-enet": "==1.3.10",
+        "logger": "~master"
+    }
+}
