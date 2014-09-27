@@ -1,17 +1,14 @@
 {
-    "name": "enet-test",
-    "description": "ENet test",
+    "name": "enet-tutorials",
+    "description": "D ENet client/server tutorials",
     "license": "Boost",
     "authors": [
-        "MrSmith33"
+        "Andrey Penechko"
     ],
 
-    "mainSourceFile": "main.d",
-    "sourceFiles" : ["main.d"],
-    "targetType" : "executable",
+    "targetType": "none",
 
-    "dependencies": {
-        "derelict-enet": "==1.3.10",
-        "logger": "~master"
-    }
+    "subPackages": [
+        "tutorials/tut01_chatty"
+    ]
 }

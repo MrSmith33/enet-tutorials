@@ -1,0 +1,19 @@
+{
+    "name": "tut01",
+    "description": "tut01",
+    "license": "Boost",
+    "authors": [
+        "Andrey Penechko"
+    ],
+
+    "mainSourceFile": "main.d",
+    "sourceFiles" : ["main.d"],
+    "targetType" : "executable",
+
+    "dependencies": {
+        "derelict-enet": "==1.3.10"
+    },
+
+    "targetPath" : "../../bin",
+    "workingDirectory" : "../../bin",
+}

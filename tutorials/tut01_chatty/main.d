@@ -1,9 +1,9 @@
 import derelict.enet.enet;
 import std.stdio;
-import std.logger;
 import std.parallelism;
 import std.conv : to;
 
+// Stores info about connected peer. Used in server
 struct PeerInfo
 {
 	uint id;
@@ -45,11 +45,11 @@ struct Server
 
 		if (host is null)
 		{
-			writeln("An error occured while trying to create an ENet server host");
+			writeln("Server: An error occured while trying to create an ENet server host");
 			return;
 		}
 
-		logf("Server started");
+		//logf("Server started");
 		isRunning = true;
 	}
 
@@ -101,12 +101,12 @@ struct Server
 	void stop()
 	{
 		enet_host_destroy(host);
-		writefln("Server stopped");
+		writefln("Server: Stopped");
 	}
 
 	void onConnect(ref ENetEvent event)
 	{
-		writefln("A new client connected from %(%s.%):%s", 
+		writefln("Server: A new client connected from %(%s.%):%s", 
 			*cast(ubyte[4]*)(&event.peer.address.host),
 			event.peer.address.port);
 
@@ -120,7 +120,7 @@ struct Server
 
 	void onPacketReceived(ref ENetEvent event)
 	{
-		writefln ("A packet of length %d containing \"%s\" was received from client %s on channel %d",
+		writefln ("Server: A packet of length %d containing \"%s\" was received from client %s on channel %d",
 			event.packet.dataLength,
 			(cast(char*)event.packet.data)[0..event.packet.dataLength],
 			(cast(PeerInfo*)event.peer.data).id,
@@ -133,7 +133,7 @@ struct Server
 
 	void onDisconnect(ref ENetEvent event)
 	{
-		writefln("client %s disconnected", (cast(PeerInfo*)event.peer.data).id);
+		writefln("Server: client %s disconnected", (cast(PeerInfo*)event.peer.data).id);
 
 		// Reset client's information
 		event.peer.data = null;
@@ -157,7 +157,7 @@ struct Client
 	void start(string address = "127.0.0.1", ushort port = 1234)
 	{
 		enet_address_set_host(&serverAddress, cast(char*)address);
-		serverAddress.port = 1234;
+		serverAddress.port = port;
 
 		host = enet_host_create(null /* create a client host */,
 			1 /* only allow 1 outgoing connection */,
@@ -167,7 +167,7 @@ struct Client
 
 		if (host is null)
 		{
-			writeln("An error occured while trying to create an ENet server host");
+			writeln("Client: An error occured while trying to create an ENet server host");
 			return;
 		}
 
@@ -176,11 +176,11 @@ struct Client
 
 		if (server is null)
 		{
-			writeln("An error occured while trying to create an ENet server peer");
+			writeln("Client: An error occured while trying to create an ENet server peer");
 			return;
 		}
 
-		writeln("Client started");
+		writeln("Client: Started");
 		isRunning = true;
 	}
 
@@ -210,7 +210,7 @@ struct Client
 	void stop()
 	{
 		enet_host_destroy(host);
-		writefln("Client stopped");
+		writefln("Client: Stopped");
 	}
 
 	void send(ubyte[] data, ubyte channel = 0)
@@ -222,10 +222,10 @@ struct Client
 
 	void onConnect(ref ENetEvent event)
 	{
-		writefln("Connection to 127.0.0.1:1234 established");
+		writefln("Client: Connection to 127.0.0.1:1234 established");
 
-		// Send 10 hello packets.
-		foreach(i; 0..10)
+		// Send 3 hello packets.
+		foreach(i; 0..3)
 		{
 			string str = "hello "~to!string(i);
 			send(cast(ubyte[])str);
@@ -236,14 +236,14 @@ struct Client
 
 	void onPacketReceived(ref ENetEvent event)
 	{
-		writefln ("A packet of length %d containing \"%s\" was received from server %s on channel %d",
+		writefln ("Client: A packet of length %d containing \"%s\" was received from server %s on channel %d",
 			event.packet.dataLength,
 			(cast(char*)event.packet.data)[0..event.packet.dataLength],
 			event.peer.data,
 			event.channelID);
 
 		++numReceived;
-		if (numReceived == 10)
+		if (numReceived == 3)
 		{
 			enet_peer_disconnect_later(server, 0);
 		}
@@ -251,7 +251,7 @@ struct Client
 
 	void onDisconnect(ref ENetEvent event)
 	{
-		writefln("client onDisconnect with data %s", event.data);
+		writefln("Client: disconnected with data %s", event.data);
 
 		// Reset server's information
 		event.peer.data = null;
@@ -276,7 +276,7 @@ void clientWorker()
 
 void serverWorker()
 {
-	writefln("Starting server");
+	writefln("Server: Starting");
 	
 	Server server;
 
@@ -305,7 +305,7 @@ void main()
 	else
 	{
 		ENetVersion ever = enet_linked_version();
-		writefln("Loaded ENet library %s.%s.%s",
+		writefln("Loaded ENet library v%s.%s.%s",
 			ENET_VERSION_GET_MAJOR(ever),
 			ENET_VERSION_GET_MINOR(ever),
 			ENET_VERSION_GET_PATCH(ever));
@@ -313,7 +313,7 @@ void main()
 
 	auto pool = taskPool();
 
+	pool.put(task!serverWorker);
 	pool.put(task!clientWorker);
 	pool.put(task!clientWorker); // more clients
-	pool.put(task!serverWorker);
 }
