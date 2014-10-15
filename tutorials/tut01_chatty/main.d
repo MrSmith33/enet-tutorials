@@ -1,12 +1,13 @@
-import derelict.enet.enet;
 import std.stdio;
 import std.parallelism;
 import std.conv : to;
 
+import derelict.enet.enet;
+
 // Stores info about connected peer. Used in server
 struct PeerInfo
 {
-	uint id;
+	ulong id;
 	ENetPeer* peer;
 }
 
@@ -22,6 +23,7 @@ struct ServerSettings
 struct Server
 {
 	uint numConnected;
+	private ulong _nextPeerId;
 	bool isRunning;
 
 	ENetHost* host;
@@ -29,6 +31,12 @@ struct Server
 	ServerSettings settings;
 
 	PeerInfo*[] clients;
+
+	ulong nextPeerId() @property
+	{
+		scope(exit) ++ _nextPeerId;
+		return _nextPeerId;
+	}
 
 	void start(ServerSettings _settings)
 	{
@@ -110,7 +118,7 @@ struct Server
 			*cast(ubyte[4]*)(&event.peer.address.host),
 			event.peer.address.port);
 
-		PeerInfo* client = new PeerInfo(numConnected, event.peer);
+		PeerInfo* client = new PeerInfo(nextPeerId, event.peer);
 		clients ~= client;
 		event.peer.data = cast(void*)client;
 		enet_peer_timeout(event.peer, 0, 0, 2000);
@@ -215,7 +223,7 @@ struct Client
 
 	void send(ubyte[] data, ubyte channel = 0)
 	{
-		ENetPacket *packet = enet_packet_create(data.ptr, data.length,
+		ENetPacket* packet = enet_packet_create(data.ptr, data.length,
 				ENET_PACKET_FLAG_RELIABLE);
 		enet_peer_send(server, channel, packet);
 	}
@@ -227,7 +235,7 @@ struct Client
 		// Send 3 hello packets.
 		foreach(i; 0..3)
 		{
-			string str = "hello "~to!string(i);
+			string str = "hello " ~ to!string(i);
 			send(cast(ubyte[])str);
 
 			enet_host_flush(host);
@@ -268,7 +276,7 @@ void clientWorker()
 
 	while (client.isRunning)
 	{
-		client.update();
+		client.update(50);
 	}
 
 	client.stop();
@@ -285,7 +293,7 @@ void serverWorker()
 
 	while (server.isRunning)
 	{
-		server.update();
+		server.update(50);
 	}
 
 	server.stop();
