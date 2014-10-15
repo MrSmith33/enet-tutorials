@@ -1,0 +1,20 @@
+{
+    "name": "tut02",
+    "description": "tut02",
+    "license": "Boost",
+    "authors": [
+        "Andrey Penechko"
+    ],
+
+    "mainSourceFile" : "main.d",
+    "sourcePaths" : ["./"],
+    "targetType" : "executable",
+
+    "dependencies": {
+        "derelict-enet": "==1.3.10",
+        "cbor-d": {"version":"==0.2.0", "path":"../../../cbor"}
+    },
+
+    "targetPath" : "../../bin",
+    "workingDirectory" : "../../bin",
+}
