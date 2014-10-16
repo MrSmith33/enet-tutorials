@@ -7,7 +7,7 @@ struct LoginPacket
 }
 
 // server response
-struct LoginInfoPacket
+struct SessionInfoPacket
 {
 	size_t yourId;
 	string[size_t] userNames;

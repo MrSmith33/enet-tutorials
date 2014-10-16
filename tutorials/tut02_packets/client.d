@@ -12,8 +12,8 @@ import connection;
 import packets;
 
 immutable randomNames = [
-"Bob", "Steve", "Alanakai", "Tyler", "Carmine", "Carrol", "Randy", "Tim",
-"Robbie", "Xavier", "Jerrell", "Robby", "Clinton", "Bob", "Berry", "Maximo",
+"Bob", "Steve", "Alanakai", "Tyler", "Carmine", "Randy", "Tim",
+"Robbie", "Xavier", "Jerrell", "Clinton", "Bob", "Berry", "Maximo",
 "Emmett", "Napoleon", "Jeffery", "Ali", "Hubert", "Jordan", "Rickey", "Jamey",
 "Bret", "Gene", "Cornell", "Garret", "Randal", "Luther", "Raymundo", "Brady",
 "Reid", "Asha", "Tari", "Isela", "Qiana", "Nada", "Nicole", "Waneta", "Mammie",
@@ -29,6 +29,8 @@ class Client : Connection
 	ENetPeer* server;
 
 	size_t myId;
+	string myName;
+
 	string[size_t] userNames;
 	string userName(size_t userId)
 	{
@@ -38,9 +40,9 @@ class Client : Connection
 	void start(string address = "127.0.0.1", ushort port = 1234)
 	{
 		registerPacket!LoginPacket;
-		registerPacket!LoginInfoPacket(&handleLoginInfoPacket);
-		registerPacket!UserLoggedInPacket;
-		registerPacket!UserLoggedOutPacket;
+		registerPacket!SessionInfoPacket(&handleSessionInfoPacket);
+		registerPacket!UserLoggedInPacket(&handleUserLoggedInPacket);
+		registerPacket!UserLoggedOutPacket(&handleUserLoggedOutPacket);
 		registerPacket!MessagePacket(&handleMessagePacket);
 
 		enet_address_set_host(&serverAddress, cast(char*)address);
@@ -90,35 +92,51 @@ class Client : Connection
 	{
 		writefln("Client: Connection to 127.0.0.1:1234 established");
 
+		// set server peer info
 		PeerInfo* peer = new PeerInfo(0, event.peer);
 		event.peer.data = cast(void*)peer;
 
-		string randomName = randomNames[uniform(0, randomNames.length)];
-		send(createPacket(LoginPacket(randomName)));
-		// Send 3 hello packets.
-		foreach(i; 0..3)
-		{
-			string str = format("hello from %s %s", randomName, i);
-			ubyte[] packet = createPacket(MessagePacket(0, str));
-			send(packet);
-			Thread.sleep(200.msecs);
-		}
+		// generate random name
+		myName = randomNames[uniform(0, randomNames.length)];
+		send(createPacket(LoginPacket(myName)));
 	}
 
-	void handleLoginInfoPacket(ubyte[] packetData, ref PeerInfo peer)
+	void handleSessionInfoPacket(ubyte[] packetData, ref PeerInfo peer)
 	{
-		LoginInfoPacket loginInfo = unpackPacket!LoginInfoPacket(packetData);
+		SessionInfoPacket loginInfo = unpackPacket!SessionInfoPacket(packetData);
 
 		userNames = loginInfo.userNames;
 		myId = loginInfo.yourId;
 
-		writefln("Client: my id is %s", myId);
+		writefln("Client %s: my id is %s", myName[0], myId);
+
+		// Send 3 hello message packets.
+		foreach(i; 0..3)
+		{
+			string str = format("hello from %s %s", myName, i);
+			ubyte[] packet = createPacket(MessagePacket(0, str));
+			send(packet);
+		}
+	}
+
+	void handleUserLoggedInPacket(ubyte[] packetData, ref PeerInfo peer)
+	{
+		UserLoggedInPacket newUser = unpackPacket!UserLoggedInPacket(packetData);
+		userNames[newUser.userId] = newUser.userName;
+		writefln("Client %s: %s has connected", myName[0], newUser.userName);
+	}
+
+	void handleUserLoggedOutPacket(ubyte[] packetData, ref PeerInfo peer)
+	{
+		UserLoggedOutPacket packet = unpackPacket!UserLoggedOutPacket(packetData);
+		writefln("Client %s: %s has disconnected", myName[0], userName(packet.userId));
+		userNames.remove(packet.userId);
 	}
 
 	void handleMessagePacket(ubyte[] packetData, ref PeerInfo peer)
 	{
 		MessagePacket msg = unpackPacket!MessagePacket(packetData);
-		writefln("Client: %s> %s", userName(msg.userId), msg.msg);
+		writefln("Client %s: %s> %s", myName[0], userName(msg.userId), msg.msg);
 	}
 
 	override void onDisconnect(ref ENetEvent event)

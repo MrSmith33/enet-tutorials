@@ -21,32 +21,76 @@ struct ServerSettings
 struct User
 {
 	string name;
-	bool loggedIn;
 }
 
-class Server : Connection
+struct UserStorage
 {
-	uint numConnected;
-	private size_t _nextPeerId = 1;
-	bool isRunning;
+	private User*[size_t] users;
 
-	ENetAddress address;
-	ServerSettings settings;
+	size_t addUser()
+	{
+		size_t id = nextPeerId;
+		User* user = new User;
+		users[id] = user;
+		return id;
+	}
 
-	PeerInfo*[] clients;
-	string[size_t] userNames;
+	void removeUser(size_t id)
+	{
+		users.remove(id);
+	}
+
+	User* findUser(size_t id)
+	{
+		return users.get(id, null);
+	}
 
 	size_t nextPeerId() @property
 	{
 		return _nextPeerId++;
 	}
 
+	string[size_t] userNames()
+	{
+		string[size_t] names;
+		foreach(id, user; users)
+		{
+			names[id] = user.name;
+		}
+
+		return names;
+	}
+
+	string userName(size_t id)
+	{
+		return users[id].name;
+	}
+
+	size_t length()
+	{
+		return users.length;
+	}
+
+	private size_t _nextPeerId = 1;
+}
+
+class Server : Connection
+{
+	bool isRunning;
+
+	ENetAddress address;
+	ServerSettings settings;
+
+	PeerInfo*[size_t] clients;
+
+	UserStorage userStorage;
+
 	void start(ServerSettings _settings)
 	{
 		side = "Server";
 
 		registerPacket!LoginPacket(&handleLoginPacket);
-		registerPacket!LoginInfoPacket;
+		registerPacket!SessionInfoPacket;
 		registerPacket!UserLoggedInPacket;
 		registerPacket!UserLoggedOutPacket;
 		registerPacket!MessagePacket(&handleMessagePacket);
@@ -121,39 +165,42 @@ class Server : Connection
 			*cast(ubyte[4]*)(&event.peer.address.host),
 			event.peer.address.port);
 
-		PeerInfo* client = new PeerInfo(nextPeerId, event.peer);
-		clients ~= client;
-		event.peer.data = cast(void*)client;
+		PeerInfo* pinfo = new PeerInfo(userStorage.addUser, event.peer);
+		clients[pinfo.id] = pinfo;
+		event.peer.data = cast(void*)pinfo;
 		enet_peer_timeout(event.peer, 0, 0, 2000);
-
-		++numConnected;
 	}
 
 	void handleLoginPacket(ubyte[] packetData, ref PeerInfo peer)
 	{
 		LoginPacket packet = unpackPacket!LoginPacket(packetData);
-		userNames[peer.id] = packet.userName;
+		userStorage.findUser(peer.id).name = packet.userName;
 		writefln("Server: %s logged in", packet.userName);
-		sendTo(only(peer), createPacket(LoginInfoPacket(peer.id, userNames)));
+		sendTo(only(peer), createPacket(SessionInfoPacket(peer.id, userStorage.userNames)));
+		sendToAll(createPacket(UserLoggedInPacket(peer.id, packet.userName)));
 	}
 
 	void handleMessagePacket(ubyte[] packetData, ref PeerInfo peer)
 	{
 		MessagePacket packet = unpackPacket!MessagePacket(packetData);
-		writefln("Server: %s> %s", userNames[peer.id], packet.msg);
+		writefln("Server: %s> %s", userStorage.userName(peer.id), packet.msg);
 		packet.userId = peer.id;
 		sendToAll(createPacket(packet));
 	}
 
 	override void onDisconnect(ref ENetEvent event)
 	{
-		writefln("Server: %s disconnected", userNames[(cast(PeerInfo*)event.peer.data).id]);
+		size_t userId = (cast(PeerInfo*)event.peer.data).id;
+		writefln("Server: %s disconnected", userStorage.userName(userId));
+		userStorage.removeUser(userId);
+		clients.remove(userId);
+
+		sendToAll(createPacket(UserLoggedOutPacket(userId)));
 
 		// Reset client's information
 		event.peer.data = null;
-		--numConnected;
 
-		if (numConnected == 0)
+		if (userStorage.length == 0)
 			isRunning = false;
 	}
 }

@@ -9,7 +9,7 @@ import client;
 import server;
 
 
-void clientWorker()
+void clientWorker(uint workTimeMsecs)
 {
 	Client client = new Client;
 
@@ -21,7 +21,7 @@ void clientWorker()
 	{
 		client.update(50);
 
-		if (Clock.currAppTick - startTime > TickDuration.from!"seconds"(3))
+		if (Clock.currAppTick - startTime > TickDuration.from!"msecs"(workTimeMsecs))
 		{
 			client.isRunning = false;
 		}
@@ -68,8 +68,9 @@ void main()
 	}
 
 	spawn(&serverWorker);
-	spawn(&clientWorker);
-	spawn(&clientWorker);
+	spawn(&clientWorker, 2500);
+	spawn(&clientWorker, 10);
+	spawn(&clientWorker, 10);
 
 	thread_joinAll;
 }
