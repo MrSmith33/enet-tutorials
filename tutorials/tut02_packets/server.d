@@ -174,8 +174,10 @@ class Server : Connection
 	void handleLoginPacket(ubyte[] packetData, ref PeerInfo peer)
 	{
 		LoginPacket packet = unpackPacket!LoginPacket(packetData);
+		
 		userStorage.findUser(peer.id).name = packet.userName;
 		writefln("Server: %s logged in", packet.userName);
+		
 		sendTo(only(peer), createPacket(SessionInfoPacket(peer.id, userStorage.userNames)));
 		sendToAll(createPacket(UserLoggedInPacket(peer.id, packet.userName)));
 	}
@@ -183,15 +185,19 @@ class Server : Connection
 	void handleMessagePacket(ubyte[] packetData, ref PeerInfo peer)
 	{
 		MessagePacket packet = unpackPacket!MessagePacket(packetData);
+		
 		writefln("Server: %s> %s", userStorage.userName(peer.id), packet.msg);
 		packet.userId = peer.id;
+		
 		sendToAll(createPacket(packet));
 	}
 
 	override void onDisconnect(ref ENetEvent event)
 	{
 		size_t userId = (cast(PeerInfo*)event.peer.data).id;
+		
 		writefln("Server: %s disconnected", userStorage.userName(userId));
+		
 		userStorage.removeUser(userId);
 		clients.remove(userId);
 

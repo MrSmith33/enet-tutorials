@@ -9,7 +9,7 @@
     "targetType": "none",
 
     "subPackages": [
-        "tutorials/tut01_chatty",
+        "tutorials/tut01_simple",
         "tutorials/tut02_packets"
     ]
 }

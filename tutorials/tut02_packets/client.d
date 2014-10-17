@@ -2,7 +2,7 @@ module client;
 
 import core.thread;
 import std.conv : to;
-import std.stdio;
+import std.stdio : writefln, writeln;
 import std.string : format;
 import std.random : uniform;
 
@@ -32,6 +32,7 @@ class Client : Connection
 	string myName;
 
 	string[size_t] userNames;
+	
 	string userName(size_t userId)
 	{
 		return userId in userNames ? userNames[userId] : format("? %s", userId);
