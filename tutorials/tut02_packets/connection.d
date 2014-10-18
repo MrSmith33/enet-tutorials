@@ -81,7 +81,9 @@ abstract class Connection
 
 		version(debug_packets) writefln("%s: creating packet %s with id %s", side, P.stringof, packetId!P);
 		version(debug_packets) writefln("%s: with fields {%s}:%s", side, packet.tupleof, numEncodableMembers!(packet));
+		
 		size = encodeCbor(bufferTemp[], packetId!P);
+		
 		version(debug_packets) writef("%s: size %s, bufferTemp[0]%02x", side, size, bufferTemp[0]);
 		version(debug_packets) writefln(" %s", decodeCbor(bufferTemp[0..1]));
 		
@@ -101,6 +103,11 @@ abstract class Connection
 		{
 			writefln("% 2s: %s", i, packetInfo.name);
 		}
+	}
+
+	void flush()
+	{
+		enet_host_flush(host);
 	}
 
 	void stop()

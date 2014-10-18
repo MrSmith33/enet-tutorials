@@ -117,6 +117,26 @@ class Server : Connection
 		isRunning = true;
 	}
 
+	void handleCommand(string command, size_t userId)
+	{
+		import std.algorithm : splitter;
+		writefln("Server: %s Command> %s", userStorage.userName(userId), command);
+		
+		if (command.length <= 1)
+		{
+			sendTo(only(*clients[userId]), createPacket(MessagePacket(0, "Invalid command")));
+			return;
+		}
+
+		// Split without leading '/'
+		auto splitted = command[1..$].splitter;
+		string commName = splitted.front;
+		splitted.popFront;
+
+		if (commName == "stop")
+			isRunning = false;
+	}
+
 	override void stop()
 	{
 		super.stop();
@@ -184,10 +204,21 @@ class Server : Connection
 
 	void handleMessagePacket(ubyte[] packetData, ref PeerInfo peer)
 	{
+		import std.algorithm : startsWith;
+		import std.string : strip;
+
 		MessagePacket packet = unpackPacket!MessagePacket(packetData);
-		
-		writefln("Server: %s> %s", userStorage.userName(peer.id), packet.msg);
+			
 		packet.userId = peer.id;
+		string strippedMsg = packet.msg.strip;
+		
+		if (strippedMsg.startsWith("/"))
+		{
+			handleCommand(strippedMsg, peer.id);
+			return;
+		}
+
+		writefln("Server: %s> %s", userStorage.userName(peer.id), packet.msg);
 		
 		sendToAll(createPacket(packet));
 	}

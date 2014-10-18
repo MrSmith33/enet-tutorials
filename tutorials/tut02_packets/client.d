@@ -118,6 +118,9 @@ class Client : Connection
 			ubyte[] packet = createPacket(MessagePacket(0, str));
 			send(packet);
 		}
+
+		//send(createPacket(MessagePacket(0, "/stop")));
+		flush();
 	}
 
 	void handleUserLoggedInPacket(ubyte[] packetData, ref PeerInfo peer)
