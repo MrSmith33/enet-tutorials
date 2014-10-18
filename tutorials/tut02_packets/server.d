@@ -117,14 +117,20 @@ class Server : Connection
 		isRunning = true;
 	}
 
+	void sendMessageTo(size_t userId, string message)
+	{
+		sendTo(only(*clients[userId]), createPacket(MessagePacket(0, message)));
+	}
+
 	void handleCommand(string command, size_t userId)
 	{
 		import std.algorithm : splitter;
+		import std.string : format;
 		writefln("Server: %s Command> %s", userStorage.userName(userId), command);
 		
 		if (command.length <= 1)
 		{
-			sendTo(only(*clients[userId]), createPacket(MessagePacket(0, "Invalid command")));
+			sendMessageTo(userId, "Invalid command");
 			return;
 		}
 
@@ -135,6 +141,8 @@ class Server : Connection
 
 		if (commName == "stop")
 			isRunning = false;
+		else
+			sendMessageTo(userId, format("Unknown command %s", commName));
 	}
 
 	override void stop()

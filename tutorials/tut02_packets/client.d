@@ -119,7 +119,7 @@ class Client : Connection
 			send(packet);
 		}
 
-		//send(createPacket(MessagePacket(0, "/stop")));
+		send(createPacket(MessagePacket(0, "/stopd")));
 		flush();
 	}
 
@@ -140,7 +140,10 @@ class Client : Connection
 	void handleMessagePacket(ubyte[] packetData, ref PeerInfo peer)
 	{
 		MessagePacket msg = unpackPacket!MessagePacket(packetData);
-		writefln("Client %s: %s> %s", myName[0], userName(msg.userId), msg.msg);
+		if (msg.userId == 0)
+			writefln("Client %s: %s", myName[0], msg.msg);
+		else
+			writefln("Client %s: %s> %s", myName[0], userName(msg.userId), msg.msg);
 	}
 
 	override void onDisconnect(ref ENetEvent event)
