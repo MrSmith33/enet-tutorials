@@ -28,12 +28,12 @@ class Client : Connection
 	ENetAddress serverAddress;
 	ENetPeer* server;
 
-	size_t myId;
+	UserId myId;
 	string myName;
 
-	string[size_t] userNames;
+	string[UserId] userNames;
 	
-	string userName(size_t userId)
+	string userName(UserId userId)
 	{
 		return userId in userNames ? userNames[userId] : format("? %s", userId);
 	}
@@ -93,16 +93,15 @@ class Client : Connection
 	{
 		writefln("Client: Connection to 127.0.0.1:1234 established");
 
-		// set server peer info
-		PeerInfo* peer = new PeerInfo(0, event.peer);
-		event.peer.data = cast(void*)peer;
+		// set server user id
+		event.peer.data = cast(void*)UserId(0);
 
 		// generate random name
 		myName = randomNames[uniform(0, randomNames.length)];
 		send(createPacket(LoginPacket(myName)));
 	}
 
-	void handleSessionInfoPacket(ubyte[] packetData, ref PeerInfo peer)
+	void handleSessionInfoPacket(ubyte[] packetData, UserId peer)
 	{
 		SessionInfoPacket loginInfo = unpackPacket!SessionInfoPacket(packetData);
 
@@ -119,25 +118,25 @@ class Client : Connection
 			send(packet);
 		}
 
-		send(createPacket(MessagePacket(0, "/stopd")));
+		//send(createPacket(MessagePacket(0, "/stop")));
 		flush();
 	}
 
-	void handleUserLoggedInPacket(ubyte[] packetData, ref PeerInfo peer)
+	void handleUserLoggedInPacket(ubyte[] packetData, UserId peer)
 	{
 		UserLoggedInPacket newUser = unpackPacket!UserLoggedInPacket(packetData);
 		userNames[newUser.userId] = newUser.userName;
 		writefln("Client %s: %s has connected", myName[0], newUser.userName);
 	}
 
-	void handleUserLoggedOutPacket(ubyte[] packetData, ref PeerInfo peer)
+	void handleUserLoggedOutPacket(ubyte[] packetData, UserId peer)
 	{
 		UserLoggedOutPacket packet = unpackPacket!UserLoggedOutPacket(packetData);
 		writefln("Client %s: %s has disconnected", myName[0], userName(packet.userId));
 		userNames.remove(packet.userId);
 	}
 
-	void handleMessagePacket(ubyte[] packetData, ref PeerInfo peer)
+	void handleMessagePacket(ubyte[] packetData, UserId peer)
 	{
 		MessagePacket msg = unpackPacket!MessagePacket(packetData);
 		if (msg.userId == 0)

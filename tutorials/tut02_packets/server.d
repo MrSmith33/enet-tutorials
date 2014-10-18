@@ -21,38 +21,40 @@ struct ServerSettings
 struct User
 {
 	string name;
+	ENetPeer* peer;
 }
 
 struct UserStorage
 {
-	private User*[size_t] users;
+	private User*[UserId] users;
 
-	size_t addUser()
+	UserId addUser(ENetPeer* peer)
 	{
-		size_t id = nextPeerId;
+		UserId id = nextPeerId;
 		User* user = new User;
+		user.peer = peer;
 		users[id] = user;
 		return id;
 	}
 
-	void removeUser(size_t id)
+	void removeUser(UserId id)
 	{
 		users.remove(id);
 	}
 
-	User* findUser(size_t id)
+	User* findUser(UserId id)
 	{
 		return users.get(id, null);
 	}
 
-	size_t nextPeerId() @property
+	UserId nextPeerId() @property
 	{
 		return _nextPeerId++;
 	}
 
-	string[size_t] userNames()
+	string[UserId] userNames()
 	{
-		string[size_t] names;
+		string[UserId] names;
 		foreach(id, user; users)
 		{
 			names[id] = user.name;
@@ -61,9 +63,14 @@ struct UserStorage
 		return names;
 	}
 
-	string userName(size_t id)
+	string userName(UserId id)
 	{
 		return users[id].name;
+	}
+
+	ENetPeer* userPeer(UserId id)
+	{
+		return users[id].peer;
 	}
 
 	size_t length()
@@ -71,7 +78,7 @@ struct UserStorage
 		return users.length;
 	}
 
-	private size_t _nextPeerId = 1;
+	private UserId _nextPeerId = 1;
 }
 
 class Server : Connection
@@ -80,8 +87,6 @@ class Server : Connection
 
 	ENetAddress address;
 	ServerSettings settings;
-
-	PeerInfo*[size_t] clients;
 
 	UserStorage userStorage;
 
@@ -117,12 +122,12 @@ class Server : Connection
 		isRunning = true;
 	}
 
-	void sendMessageTo(size_t userId, string message)
+	void sendMessageTo(UserId userId, string message)
 	{
-		sendTo(only(*clients[userId]), createPacket(MessagePacket(0, message)));
+		sendTo(only(userId), createPacket(MessagePacket(0, message)));
 	}
 
-	void handleCommand(string command, size_t userId)
+	void handleCommand(string command, UserId userId)
 	{
 		import std.algorithm : splitter;
 		import std.string : format;
@@ -152,21 +157,21 @@ class Server : Connection
 	}
 
 	/// Sending
-	void sendTo(R)(R peerInfos, ubyte[] data, ubyte channel = 0)
-		if (isInputRange!R && is(ElementType!R == PeerInfo))
+	void sendTo(R)(R users, ubyte[] data, ubyte channel = 0)
+		if (isInputRange!R && is(ElementType!R == UserId))
 	{
 		ENetPacket *packet = enet_packet_create(data.ptr, data.length,
 				ENET_PACKET_FLAG_RELIABLE);
-		sendTo(peerInfos, packet, channel);
+		sendTo(users, packet, channel);
 	}
 
 	/// ditto
-	void sendTo(R)(R peerInfos, ENetPacket* packet, ubyte channel = 0)
-		if (isInputRange!R && is(ElementType!R == PeerInfo))
+	void sendTo(R)(R users, ENetPacket* packet, ubyte channel = 0)
+		if (isInputRange!R && is(ElementType!R == UserId))
 	{
-		foreach(peerInfo; peerInfos)
+		foreach(userId; users)
 		{
-			enet_peer_send(peerInfo.peer, channel, packet);
+			enet_peer_send(userStorage.userPeer(userId), channel, packet);
 		}
 	}
 
@@ -193,52 +198,49 @@ class Server : Connection
 			*cast(ubyte[4]*)(&event.peer.address.host),
 			event.peer.address.port);
 
-		PeerInfo* pinfo = new PeerInfo(userStorage.addUser, event.peer);
-		clients[pinfo.id] = pinfo;
-		event.peer.data = cast(void*)pinfo;
+		event.peer.data = cast(void*)userStorage.addUser(event.peer);
 		enet_peer_timeout(event.peer, 0, 0, 2000);
 	}
 
-	void handleLoginPacket(ubyte[] packetData, ref PeerInfo peer)
+	void handleLoginPacket(ubyte[] packetData, UserId userId)
 	{
 		LoginPacket packet = unpackPacket!LoginPacket(packetData);
 		
-		userStorage.findUser(peer.id).name = packet.userName;
+		userStorage.findUser(userId).name = packet.userName;
 		writefln("Server: %s logged in", packet.userName);
 		
-		sendTo(only(peer), createPacket(SessionInfoPacket(peer.id, userStorage.userNames)));
-		sendToAll(createPacket(UserLoggedInPacket(peer.id, packet.userName)));
+		sendTo(only(userId), createPacket(SessionInfoPacket(userId, userStorage.userNames)));
+		sendToAll(createPacket(UserLoggedInPacket(userId, packet.userName)));
 	}
 
-	void handleMessagePacket(ubyte[] packetData, ref PeerInfo peer)
+	void handleMessagePacket(ubyte[] packetData, UserId userId)
 	{
 		import std.algorithm : startsWith;
 		import std.string : strip;
 
 		MessagePacket packet = unpackPacket!MessagePacket(packetData);
 			
-		packet.userId = peer.id;
+		packet.userId = userId;
 		string strippedMsg = packet.msg.strip;
 		
 		if (strippedMsg.startsWith("/"))
 		{
-			handleCommand(strippedMsg, peer.id);
+			handleCommand(strippedMsg, userId);
 			return;
 		}
 
-		writefln("Server: %s> %s", userStorage.userName(peer.id), packet.msg);
+		writefln("Server: %s> %s", userStorage.userName(userId), packet.msg);
 		
 		sendToAll(createPacket(packet));
 	}
 
 	override void onDisconnect(ref ENetEvent event)
 	{
-		size_t userId = (cast(PeerInfo*)event.peer.data).id;
+		UserId userId = cast(UserId)event.peer.data;
 		
 		writefln("Server: %s disconnected", userStorage.userName(userId));
 		
 		userStorage.removeUser(userId);
-		clients.remove(userId);
 
 		sendToAll(createPacket(UserLoggedOutPacket(userId)));
 

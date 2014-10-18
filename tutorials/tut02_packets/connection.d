@@ -9,15 +9,11 @@ import cbor;
 //version = debug_packets;
 
 // Stores info about connected peer. Used in server
-struct PeerInfo
-{
-	size_t id;
-	ENetPeer* peer;
-}
+alias UserId = size_t;
 
 /// Packet handler.
 /// Returns true if data was valid and false otherwise.
-alias PacketHandler = void delegate(ubyte[] packetData, ref PeerInfo peer);
+alias PacketHandler = void delegate(ubyte[] packetData, UserId peer);
 
 struct PacketInfo
 {
@@ -61,7 +57,7 @@ abstract class Connection
 		packetMap[typeid(P)] = pinfo;
 	}
 
-	bool handlePacket(size_t packetId, ubyte[] packetData, ref PeerInfo peerInfo)
+	bool handlePacket(size_t packetId, ubyte[] packetData, UserId peerInfo)
 	{
 		if (packetId >= packetArray.length)
 			return false; // invalid packet
@@ -154,7 +150,7 @@ abstract class Connection
 				side, packetName(packetId), packetId,
 				event.packet.dataLength, cast(char[])fullPacketData, fullPacketData);
 
-			handlePacket(packetId, packetData, *cast(PeerInfo*)event.peer.data);
+			handlePacket(packetId, packetData, cast(UserId)event.peer.data);
 		}
 		catch(CborException e)
 		{
