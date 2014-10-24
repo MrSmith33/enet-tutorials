@@ -13,6 +13,7 @@ To build use `dub build :tut01`.
 To build use `dub build :tut02`.
 
 3. A client/server chat application. Client is a gui application that uses anchovy library for gui. A simple user storage on server is implemented. Client and server implemented as separate configurations, with client being the default one.<br/>
+Also, a simple `/exit` command is implemented on the server.<br/>
 You can build a client with `dub build :tut03 --config=client`, or simply by `dub build :tut03`.<br/>
 A server is built like `dub build :tut03 --config=server`.
 
