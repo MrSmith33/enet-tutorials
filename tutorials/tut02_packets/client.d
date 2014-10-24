@@ -93,9 +93,6 @@ class Client : Connection
 	{
 		writefln("Client: Connection to 127.0.0.1:1234 established");
 
-		// set server user id
-		event.peer.data = cast(void*)UserId(0);
-
 		// generate random name
 		myName = randomNames[uniform(0, randomNames.length)];
 		send(createPacket(LoginPacket(myName)));

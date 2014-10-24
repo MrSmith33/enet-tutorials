@@ -16,5 +16,5 @@
     },
 
     "targetPath" : "../../bin",
-    "workingDirectory" : "../../bin",
+    "workingDirectory" : "../../bin"
 }

@@ -1,0 +1,21 @@
+import "widgets"
+
+template:messageInput {
+	tree style="edit" {
+	}
+}
+
+template:mainLayer {
+	tree layout="vertical" hasBack=false spacing=2 pading=2 {
+		hcontainer padding=2 spacing=2 hexpand=true {
+			caption-edit caption="Nick:" text="User" id="nick" minSize="140 20"
+			caption-edit caption="IP:" text="127.0.0.1" id="ip" minSize="120 20"
+			caption-edit caption="port:" text="1234" id="port" minSize="80 20"
+			text-button id="connect" text="Connect"
+		}
+
+		stringlist id="messages" hexpand=true vexpand=true
+
+		messageInput id="messsageInput" hexpand=true
+	}
+}

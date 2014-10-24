@@ -10,6 +10,7 @@
 
     "subPackages": [
         "tutorials/tut01_simple",
-        "tutorials/tut02_packets"
+        "tutorials/tut02_packets",
+        "tutorials/tut03_chat"
     ]
 }
