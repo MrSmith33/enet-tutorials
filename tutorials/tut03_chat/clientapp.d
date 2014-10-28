@@ -1,3 +1,9 @@
+/**
+Copyright: Copyright (c) 2014 Andrey Penechko.
+License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
+Authors: Andrey Penechko.
+*/
+
 module clientapp;
 
 import std.datetime;
@@ -39,6 +45,7 @@ class ChatClientApp : Application!GlfwWindow
 	Client client;
 	SimpleList!dstring messageList;
 	Widget msgInput;
+	Widget connectButton;
 	MessageInputBehavior messageInput;
 
 	this(uvec2 windowSize, string caption)
@@ -71,9 +78,9 @@ class ChatClientApp : Application!GlfwWindow
 		messageInput = msgInput.getWidgetBehavior!MessageInputBehavior();
 		messageInput.onEnter = &onEnter;
 
-		context.getWidgetById("connect").addEventHandler(&onConnect);
+		connectButton = context.getWidgetById("connect");
+		connectButton.addEventHandler(&onConnect);
 		context.getWidgetById("messages").setProperty!("list", List!dstring)(messageList);
-		messageList.push("first");
 	}
 
 	override void unload()
@@ -89,6 +96,12 @@ class ChatClientApp : Application!GlfwWindow
 
 	bool onConnect(Widget widget, PointerClickEvent event)
 	{
+		if (client && client.isRunning)
+		{
+			doDisconnect();
+			return true;
+		}
+
 		string address = context.getWidgetById("ip")["text"].coerce!string;
 		ushort port = context.getWidgetById("port")["text"].coerce!ushort;
 		string name = context.getWidgetById("nick")["text"].coerce!string;
@@ -106,16 +119,22 @@ class ChatClientApp : Application!GlfwWindow
 			client.start();
 		}
 
-		writefln("%s", address);
-
 		client.connect(name, address, port);
 
+		connectButton["text"] = "Disconnect";
+
 		return true;
+	}
+
+	void doDisconnect()
+	{
+		client.disconnnect();
 	}
 
 	void onDisconnect()
 	{
 		printfln("Disconnected from server");
+		connectButton["text"] = "Connect";
 	}
 
 	void onEnter()

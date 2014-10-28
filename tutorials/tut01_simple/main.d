@@ -1,3 +1,12 @@
+/**
+Copyright: Copyright (c) 2014 Andrey Penechko.
+License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
+Authors: Andrey Penechko.
+
+Tutorial 1 of enet tutorials.
+Simple packet exchange example.
+*/
+
 import std.stdio;
 import std.parallelism;
 import std.conv : to;
@@ -38,6 +47,7 @@ struct Server
 		return _nextPeerId;
 	}
 
+	// Starts server on port provided in _settings.port
 	void start(ServerSettings _settings)
 	{
 		settings = _settings;
@@ -57,10 +67,12 @@ struct Server
 			return;
 		}
 
-		//logf("Server started");
 		isRunning = true;
 	}
 
+	// Updates a server.
+	// msecs parameter specifies how long to wait on message before returning
+	// On event calls handlers which are located below.
 	void update(uint msecs = 1000)
 	{
 		ENetEvent event;
@@ -84,6 +96,7 @@ struct Server
 		}
 	}
 
+	// Sends packet containing data to _clients on some channel
 	void sendTo(PeerInfo[] _clients, ubyte[] data, ubyte channel = 0)
 	{
 		foreach(client; _clients)
@@ -94,6 +107,7 @@ struct Server
 		}
 	}
 
+	// ditto but to all clients
 	void sendToAll(ubyte[] data, ubyte channel = 0)
 	{
 		ENetPacket *packet = enet_packet_create(data.ptr, data.length,
@@ -101,11 +115,13 @@ struct Server
 		enet_host_broadcast(host, channel, packet);
 	}
 
+	// ditto but resends existing packet
 	void sendToAll(ENetPacket* packet, ubyte channel = 0)
 	{
 		enet_host_broadcast(host, channel, packet);
 	}
 
+	// 
 	void stop()
 	{
 		enet_host_destroy(host);

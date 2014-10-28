@@ -1,3 +1,9 @@
+/**
+Copyright: Copyright (c) 2014 Andrey Penechko.
+License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
+Authors: Andrey Penechko.
+*/
+
 module client;
 
 import core.thread;
@@ -82,6 +88,11 @@ class Client : Connection
 
 		writeln("Started");
 		isRunning = true;
+	}
+
+	void disconnnect()
+	{
+		enet_peer_disconnect(server, 0);
 	}
 
 	override void stop()
