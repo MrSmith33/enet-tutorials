@@ -18,14 +18,14 @@ abstract class BaseServer(Client) : Connection
 {
 	ClientStorage!Client clientStorage;
 	
-	this(ConnectionSettings settings, uint host, ushort port)
+	void start(ConnectionSettings settings, uint host, ushort port)
 	{
 		ENetAddress address;
 		address.host = host;
 		address.port = port;
 		settings.address = &address;
 
-		super(settings);
+		super.start(settings);
 	}
 
 	void disconnectAll()

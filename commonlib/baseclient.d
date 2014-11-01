@@ -19,11 +19,6 @@ abstract class BaseClient : Connection
 {
 	ENetAddress serverAddress;
 	ENetPeer* server;
-	
-	this(ConnectionSettings settings)
-	{
-		super(settings);
-	}
 
 	void connect(string name, string address, ushort port)
 	{
@@ -38,8 +33,6 @@ abstract class BaseClient : Connection
 			writeln("An error occured while trying to create an ENet server peer");
 			return;
 		}
-
-		isRunning = true;
 	}
 
 	void disconnnect()

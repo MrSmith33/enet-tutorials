@@ -4,19 +4,20 @@ License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
 Authors: Andrey Penechko.
 */
 
-import connection;
+import connection : ConnectionSettings, loadEnet;
 import derelict.enet.enet;
+import packets : registerPackets;
+import server : Server;
 
 void main()
 {
 	loadEnet();
 
-	ENetAddress* address = new ENetAddress(ENET_HOST_ANY, 1234);
-	ConnectionSettings settings = {address, 32, 2, 0, 0};
-	//auto server = new Server();
+	auto server = new Server();
+	registerPackets(server);
 
-	//server.start(settings);
-
+	ConnectionSettings settings = {null, 32, 2, 0, 0};
+	//server.start(settings, ENET_HOST_ANY, 1234);
 	//while (server.isRunning)
 	//{
 	//	server.update(100);

@@ -1,0 +1,17 @@
+{
+    "name": "commonlib",
+    "description": "Common networking stuff. A basic networking library.",
+    "license": "Boost",
+    "authors": [
+        "Andrey Penechko"
+    ],
+
+    "sourcePaths" : ["./"],
+    "targetType" : "library",
+    "importPaths": ["./"],
+
+    "dependencies": {
+        "derelict-enet": "==1.3.10",
+        "cbor-d": ">=0.2.0"
+    }
+}

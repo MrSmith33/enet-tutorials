@@ -3,6 +3,7 @@ module server;
 import connection;
 import derelict.enet.enet;
 import baseserver;
+import packets;
 
 struct Client
 {
@@ -11,8 +12,5 @@ struct Client
 
 class Server : BaseServer!Client
 {
-	this(ConnectionSettings settings, uint host, ushort port)
-	{
-		super(settings, host, port);
-	}
+
 }

@@ -74,7 +74,7 @@ abstract class Connection
 	void delegate() connectHandler;
 	void delegate() disconnectHandler;
 
-	start(ConnectionSettings settings)
+	void start(ConnectionSettings settings)
 	{
 		if (isRunning) stop();
 
