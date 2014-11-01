@@ -11,6 +11,7 @@
     "subPackages": [
         "tutorials/tut01_simple",
         "tutorials/tut02_packets",
-        "tutorials/tut03_chat"
+        "tutorials/tut03_chat",
+        "tutorials/tut04_library",
+        "tutorials/tut05_game"
     ]
-}
