@@ -30,7 +30,7 @@ abstract class BaseServer(Client) : Connection
 
 	void disconnectAll()
 	{
-		foreach(user; clientStorage.byClient)
+		foreach(user; clientStorage.clients.byValue)
 		{
 			enet_peer_disconnect(user.peer, 0);
 		}
@@ -38,7 +38,7 @@ abstract class BaseServer(Client) : Connection
 
 	/// Sending
 	void sendTo(R)(R clients, ubyte[] data, ubyte channel = 0)
-		if (isInputRange!R && is(ElementType!R == UserId))
+		if (isInputRange!R && is(ElementType!R == ClientId))
 	{
 		ENetPacket *packet = enet_packet_create(data.ptr, data.length,
 				ENET_PACKET_FLAG_RELIABLE);
@@ -47,7 +47,7 @@ abstract class BaseServer(Client) : Connection
 
 	/// ditto
 	void sendTo(R)(R clients, ENetPacket* packet, ubyte channel = 0)
-		if (isInputRange!R && is(ElementType!R == UserId))
+		if (isInputRange!R && is(ElementType!R == ClientId))
 	{
 		foreach(clientId; clients)
 		{

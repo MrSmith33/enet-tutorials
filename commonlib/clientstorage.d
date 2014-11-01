@@ -21,7 +21,8 @@ class ClientStorage(Client)
 	static assert(hasMember!(Client, "peer") &&
 		is(typeof(Client.peer) == ENetPeer*),
 		"Client type must have peer member");
-	private Client*[ClientId] clients;
+
+	Client*[ClientId] clients;
 
 	ClientId addClient(ENetPeer* peer)
 	{
@@ -45,11 +46,6 @@ class ClientStorage(Client)
 	ENetPeer* clientPeer(ClientId id)
 	{
 		return clients[id].peer;
-	}
-
-	auto byClient()
-	{
-		return clients.byValue;
 	}
 
 	size_t length()
