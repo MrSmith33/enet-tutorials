@@ -14,14 +14,14 @@ void main()
 	loadEnet();
 
 	auto server = new Server();
-	registerPackets(server);
+	
 
 	ConnectionSettings settings = {null, 32, 2, 0, 0};
-	//server.start(settings, ENET_HOST_ANY, 1234);
-	//while (server.isRunning)
-	//{
-	//	server.update(100);
-	//}
+	server.start(settings, ENET_HOST_ANY, 1234);
+	while (server.isRunning)
+	{
+		server.update(100);
+	}
 
-	//server.stop();
+	server.stop();
 }

@@ -144,7 +144,7 @@ abstract class Connection
 	}
 
 	// packetData must contain data with packet id stripped off.
-	auto ref P unpackPacket(P)(ubyte[] packetData)
+	P unpackPacket(P)(ubyte[] packetData)
 	{
 		return decodeCborSingleDup!P(packetData);
 	}
@@ -167,7 +167,7 @@ abstract class Connection
 		enet_host_destroy(host);
 	}
 
-	void update(uint msecs = 1000)
+	void update(uint msecs)
 	{
 		ENetEvent event;
 		int eventStatus = enet_host_service(host, &event, msecs);

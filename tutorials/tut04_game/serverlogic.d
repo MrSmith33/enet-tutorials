@@ -1,8 +1,11 @@
 module serverlogic;
 
+import std.stdio;
 import std.container : DList;
 import core.thread : Fiber;
 
+import connection;
+import server;
 import packets;
 
 enum boardWidth = 6;
@@ -76,37 +79,50 @@ struct Player
 	uint score;
 }
 
-struct GameEvent
+enum ActionType
 {
-	//Player                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
-}
-
-struct EventQueue
-{
-
+	// - no packet data, + with packet data
+	/*-*/ ready,
+	/*-*/ unready,
+	/*-*/ start
 }
 
 struct Action
 {
-
+	ActionType type;
+	ClientId clientId;
+	ubyte[] packetData;
 }
 
 class ServerLogicFiber : Fiber
 {
 	DList!Action* queue;
+	Server server;
 
 	Action waitForAction()
 	{
 		import std.range : moveFront;
-		if (queue.empty)
+		while (queue.empty)
+		{
 			Fiber.yield();
-		return queue.moveFront;
+		}
+		auto item = queue.front;
+		queue.removeFront;
+		return item;
 	}
 
-	this(DList!Action* queue)
+	this(DList!Action* queue, Server server)
 	{
+		assert(queue && server);
+
 		this.queue = queue;
+		this.server = server;
 		super(&run);
+	}
+
+	Client* getClient(ClientId id)
+	{
+		return server.clientStorage.clients[id];
 	}
 
 	// LOGIC
@@ -117,6 +133,8 @@ class ServerLogicFiber : Fiber
 		Player[] players;
 
 		board = boardGen();
+		waitForReady();
+		server.isRunning = false;
 		start(board);
 		setup();
 		rounds();
@@ -191,6 +209,26 @@ class ServerLogicFiber : Fiber
 		board[4, 5].systemLevel = middles[1][ indexes[rand][3] ];
 
 		return board;
+	}
+
+	void waitForReady()
+	{
+		int numReady;
+		while (numReady < 3)
+		{
+			Action a = waitForAction();
+
+			if (a.type == ActionType.ready ||
+				a.type == ActionType.unready)
+			{
+				bool newReadyState = a.type == ActionType.ready;
+				int diff = newReadyState - getClient(a.clientId).isReady;
+				getClient(a.clientId).isReady = newReadyState;
+				numReady += diff;
+
+				writefln("Num ready %s", numReady);
+			}
+		}
 	}
   
 	void start(const ref GameBoard board)

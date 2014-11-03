@@ -20,7 +20,7 @@ abstract class BaseClient : Connection
 	ENetAddress serverAddress;
 	ENetPeer* server;
 
-	void connect(string name, string address, ushort port)
+	void connect(string address, ushort port)
 	{
 		enet_address_set_host(&serverAddress, address.toStringz);
 		serverAddress.port = port;

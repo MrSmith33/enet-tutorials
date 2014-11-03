@@ -15,7 +15,7 @@ import connection;
 //     ENetPeer* peer;
 // }
 
-class ClientStorage(Client)
+struct ClientStorage(Client)
 {
 	import std.traits : hasMember;
 	static assert(hasMember!(Client, "peer") &&

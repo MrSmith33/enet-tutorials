@@ -6,15 +6,19 @@ import connection;
 import derelict.enet.enet;
 import baseserver;
 import packets;
+import serverlogic;
 
 struct Client
 {
+	bool isReady;
 	string name;
 	ENetPeer* peer;
 }
 
 class Server : BaseServer!Client
 {
+	ServerLogicFiber logic;
+	DList!Action actionQueue;
 	bool isStopping;
 
 	string[ClientId] clientNames()
@@ -26,6 +30,24 @@ class Server : BaseServer!Client
 		}
 
 		return names;
+	}
+
+	override void start(ConnectionSettings settings, uint host, ushort port)
+	{
+		registerPackets(this);
+		super.start(settings, host, port);
+		
+		logic = new ServerLogicFiber(&actionQueue, this);
+		registerPacketHandler!LoginPacket(&handleLoginPacket);
+		registerPacketHandler!MessagePacket(&handleMessagePacket);
+		registerPacketHandler!ReadyPacket(&handleReadyPacket);
+	}
+
+	override void update(uint msecs)
+	{
+		super.update(msecs);
+		if (logic.state == Fiber.State.HOLD)
+			logic.call();
 	}
 
 	void sendMessageTo(ClientId userId, string message)
@@ -108,5 +130,16 @@ class Server : BaseServer!Client
 		{
 			isRunning = false;
 		}
+	}
+
+	// Game packet handlers
+
+	void handleReadyPacket(ubyte[] packetData, ClientId clientId)
+	{
+		ReadyPacket packet = unpackPacket!ReadyPacket(packetData);
+		if (packet.isReady)
+			actionQueue.insertBack(Action(ActionType.ready, clientId));
+		else
+			actionQueue.insertBack(Action(ActionType.unready, clientId));
 	}
 }

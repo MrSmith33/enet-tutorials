@@ -17,6 +17,7 @@ void registerPackets(Connection c)
 	c.registerPacket!ClientLoggedOutPacket;
 	c.registerPacket!MessagePacket;
 
+	c.registerPacket!ReadyPacket;
 	c.registerPacket!DeployShipsPacket;
 	c.registerPacket!PlanPacket;
 	c.registerPacket!BoardDataPacket;
@@ -54,6 +55,11 @@ struct MessagePacket
 }
 
 // Game packets
+
+struct ReadyPacket
+{
+	bool isReady;
+}
 
 struct DeployShipsPacket
 {
