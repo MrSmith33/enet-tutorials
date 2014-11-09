@@ -56,6 +56,14 @@ abstract class BaseServer(Client) : Connection
 		}
 	}
 
+	void sendTo(R, P)(R clients, auto ref const(P) packet, ubyte channel = 0)
+		if (isInputRange!R &&
+			is(ElementType!R == ClientId) &&
+			is(P == struct))
+	{
+		sendTo(clients, createPacket(packet), channel);
+	}
+
 	/// ditto
 	void sendToAll(ubyte[] data, ubyte channel = 0)
 	{
@@ -68,5 +76,11 @@ abstract class BaseServer(Client) : Connection
 	void sendToAll(ENetPacket* packet, ubyte channel = 0)
 	{
 		enet_host_broadcast(host, channel, packet);
+	}
+
+	void sendToAll(P)(auto ref P packet, ubyte channel = 0)
+		if (is(P == struct))
+	{
+		sendToAll(createPacket(packet), channel);
 	}
 }

@@ -132,7 +132,7 @@ abstract class Connection
 		return true;
 	}
 
-	ubyte[] createPacket(P)(auto ref P packet)
+	ubyte[] createPacket(P)(auto ref const(P) packet)
 	{
 		ubyte[] bufferTemp = buffer;
 		size_t size;

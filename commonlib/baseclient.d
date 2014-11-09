@@ -46,4 +46,10 @@ abstract class BaseClient : Connection
 				ENET_PACKET_FLAG_RELIABLE);
 		enet_peer_send(server, channel, packet);
 	}
+
+	void send(P)(auto ref const(P) packet, ubyte channel = 0)
+		if (is(P == struct))
+	{
+		send(createPacket(packet), channel);
+	}
 }
