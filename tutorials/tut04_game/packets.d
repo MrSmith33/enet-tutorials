@@ -11,16 +11,23 @@ enum Command
 
 void registerPackets(Connection c)
 {
+	// Common
+	c.registerPacket!MessagePacket;
+	
+	// Server -> Client
 	c.registerPacket!LoginPacket;
 	c.registerPacket!SessionInfoPacket;
 	c.registerPacket!ClientLoggedInPacket;
 	c.registerPacket!ClientLoggedOutPacket;
-	c.registerPacket!MessagePacket;
+	c.registerPacket!ClientTurnPacket;
+	c.registerPacket!BoardDataPacket;
+	c.registerPacket!HexDataPacket;
 
+	// Client -> Server
 	c.registerPacket!ReadyPacket;
 	c.registerPacket!DeployShipsPacket;
 	c.registerPacket!PlanPacket;
-	c.registerPacket!BoardDataPacket;
+	c.registerPacket!EndTurnPacket;
 }
 
 // client request
@@ -61,6 +68,37 @@ struct ReadyPacket
 	bool isReady;
 }
 
+struct BoardDataPacket
+{
+	uint[54] systemLevels;
+}
+
+struct HexDataPacket
+{
+	uint hexId;
+	size_t playerId;
+	uint numShips;
+}
+
+struct EndTurnPacket{}
+
+enum ClientTurn
+{
+	deployShips,
+	plan,
+	expand,
+	explore,
+	exterminate,
+	chooseScoreSector,
+
+}
+
+struct ClientTurnPacket
+{
+	ClientTurn turn; // What turn should be made.
+	ClientId id; // Who makes turn.
+}
+
 struct DeployShipsPacket
 {
 	// hex coords of level I hex in unoccupied system.
@@ -72,7 +110,14 @@ struct PlanPacket
 	Command[3] commands;
 }
 
-struct BoardDataPacket
+struct ExpandPacket
 {
-	uint[54] systemLevels;
+	// hex coords of occupied hex.
+	uint x, y;
+}
+
+struct ExplorePacket
+{
+	// hex coords of occupied hex.
+	uint x, y;
 }

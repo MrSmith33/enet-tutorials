@@ -16,7 +16,10 @@ import derelict.enet.enet;
 
 import connection;
 import baseclient;
+
 import packets;
+import gameboard;
+
 
 immutable randomNames = [
 "Bob", "Steve", "Alanakai", "Tyler", "Carmine", "Randy", "Tim",
@@ -36,6 +39,8 @@ class Client : BaseClient
 	ClientId myId;
 	string myName;
 
+	GameBoard board;
+
 	string[ClientId] clientNames;
 	
 	string clientName(ClientId clientId)
@@ -52,11 +57,13 @@ class Client : BaseClient
 		registerPacketHandler!ClientLoggedInPacket(&handleUserLoggedInPacket);
 		registerPacketHandler!ClientLoggedOutPacket(&handleUserLoggedOutPacket);
 		registerPacketHandler!MessagePacket(&handleMessagePacket);
+		registerPacketHandler!BoardDataPacket(&handleBoardDataPacket);
+		registerPacketHandler!ClientTurnPacket(&handleClientTurnPacket);
 	}
 
 	override void onConnect(ref ENetEvent event)
 	{
-		writefln("Client: Connection to 127.0.0.1:1234 established");
+		writefln("Connection to 127.0.0.1:1234 established");
 
 		// generate random name
 		myName = randomNames[uniform(0, randomNames.length)];
@@ -71,6 +78,9 @@ class Client : BaseClient
 		myId = loginInfo.yourId;
 
 		send(createPacket(ReadyPacket(true)));
+		send(createPacket(ReadyPacket(false)));
+		send(createPacket(ReadyPacket(true)));
+		send(createPacket(ReadyPacket(true)));
 		flush();
 	}
 
@@ -78,13 +88,13 @@ class Client : BaseClient
 	{
 		ClientLoggedInPacket newUser = unpackPacket!ClientLoggedInPacket(packetData);
 		clientNames[newUser.clientId] = newUser.clientName;
-		writefln("Client %s: %s has connected", myName[0], newUser.clientName);
+		writefln("%s has connected", newUser.clientName);
 	}
 
 	void handleUserLoggedOutPacket(ubyte[] packetData, ClientId peer)
 	{
 		ClientLoggedOutPacket packet = unpackPacket!ClientLoggedOutPacket(packetData);
-		writefln("Client %s: %s has disconnected", myName[0], clientName(packet.clientId));
+		writefln("%s has disconnected", clientName(packet.clientId));
 		clientNames.remove(packet.clientId);
 	}
 
@@ -92,19 +102,53 @@ class Client : BaseClient
 	{
 		MessagePacket msg = unpackPacket!MessagePacket(packetData);
 		if (msg.clientId == 0)
-			writefln("Client %s: %s", myName[0], msg.msg);
+			writefln("%s", msg.msg);
 		else
-			writefln("Client %s: %s> %s", myName[0], clientName(msg.clientId), msg.msg);
+			writefln("%s> %s", clientName(msg.clientId), msg.msg);
 	}
 
 	override void onDisconnect(ref ENetEvent event)
 	{
-		writefln("Client: disconnected with data %s", event.data);
+		writefln("disconnected with data %s", event.data);
 
 		// Reset server's information
 		event.peer.data = null;
 		
 		isRunning = false;
+	}
+
+	void handleBoardDataPacket(ubyte[] packetData, ClientId peer)
+	{
+		auto packet = unpackPacket!BoardDataPacket(packetData);
+		foreach(i, level; packet.systemLevels)
+		{
+			if (i >= board.data.length) break;
+			board.data[i].systemLevel = level;
+		}
+	}
+
+	void handleClientTurnPacket(ubyte[] packetData, ClientId peer)
+	{
+		auto packet = unpackPacket!ClientTurnPacket(packetData);
+		if (packet.id == myId)
+		{
+			final switch(packet.turn)
+			{
+				case deployShips:
+
+					break;
+				case plan:
+					break;
+				case expand:
+					break;
+				case explore:
+					break;
+				case exterminate:
+					break;
+				case chooseScoreSector:
+					break;
+			}
+		}
 	}
 }
 
@@ -113,11 +157,11 @@ void main(string[] args)
 	loadEnet();
 
 	auto client = new Client;
-
 	ConnectionSettings settings = {null, 1, 2, 0, 0};
+	
 	client.start(settings);
-	writefln("%s", client.isRunning);
 	client.connect("127.0.0.1", 1234);
+
 	while (client.isRunning)
 	{
 		client.update(100);

@@ -1,78 +1,20 @@
 module serverlogic;
 
+import std.algorithm : canFind, remove;
 import std.stdio;
-import std.container : DList;
+import std.container : DList, SList;
+import std.range;
 import core.thread : Fiber;
 
 import connection;
 import server;
 import packets;
 
-enum boardWidth = 6;
-enum boardHeight = 9;
-enum numRounds = 9;
-
-struct Hex
-{
-	size_t playerId;
-	uint numShips;
-	uint systemLevel;
-}
-
-enum triPrimeX = 2;
-enum triPrimeY = 3;
-
-bool isTriPrime(size_t x, size_t y)
-{
-	return
-		(y == 3 && x == 2) ||
-		(y == 4 && (x == 2 || x == 3)) ||
-		(y == 5 && x == 2);
-}
-
-// 6 x 9
-struct GameBoard
-{
-	// 6
-	private Hex[54] data;
-
-	ref Hex triPrime() @property
-	{
-		return data[triPrimeX + triPrimeY * boardWidth];
-	}
-
-	ref Hex triPrime(Hex newData) @property
-	{
-		return data[triPrimeX + triPrimeY * boardWidth] = newData;
-	}
-
-	ref Hex opIndex(size_t x, size_t y)
-	{
-		// x < 6 on even row, x < 5 on odd row.
-		assert(x < boardWidth - (y % 2));
-
-		if (isTriPrime(x, y))
-			return triPrime;
-
-		return data[x + y * boardWidth];
-	}
-
-	ref Hex opIndexAssign(Hex newData, size_t x, size_t y)
-	{
-		// x < 6 on even row, x < 5 on odd row.
-		assert(x < boardWidth - (y % 2));
-
-		if (isTriPrime(x, y))
-			return triPrime = newData;
-
-		return data[x + y * boardWidth] = newData;
-	}
-}
+import gameboard;
 
 struct Player
 {
-	Command[3] commands;
-	Command[] remainingCommands;
+	ClientId clientId;
 	bool hasPlan;
 
 	uint numberOfShips;
@@ -84,7 +26,7 @@ enum ActionType
 	// - no packet data, + with packet data
 	/*-*/ ready,
 	/*-*/ unready,
-	/*-*/ start
+	/*-*/ deployShips
 }
 
 struct Action
@@ -130,13 +72,18 @@ class ServerLogicFiber : Fiber
 	void run()
 	{
 		GameBoard board;
-		Player[] players;
+		ClientId[] players;
 
+		waitForReady(players);
+		writeln(players);
 		board = boardGen();
-		waitForReady();
+		BoardDataPacket packet;
+		foreach(i, hex; board.data)
+			packet.systemLevels[i] = hex.systemLevel;
+		server.sendToAll(server.createPacket(packet));
+
+		deployShips(board, players);
 		server.isRunning = false;
-		start(board);
-		setup();
 		rounds();
 		endGame();
 	}
@@ -211,34 +158,62 @@ class ServerLogicFiber : Fiber
 		return board;
 	}
 
-	void waitForReady()
+	void waitForReady(ref ClientId[] players)
 	{
 		int numReady;
 		while (numReady < 3)
 		{
 			Action a = waitForAction();
 
-			if (a.type == ActionType.ready ||
-				a.type == ActionType.unready)
+			if (a.type == ActionType.ready && !getClient(a.clientId).isReady)
 			{
-				bool newReadyState = a.type == ActionType.ready;
-				int diff = newReadyState - getClient(a.clientId).isReady;
-				getClient(a.clientId).isReady = newReadyState;
-				numReady += diff;
-
-				writefln("Num ready %s", numReady);
+				getClient(a.clientId).isReady = true;
+				players ~= a.clientId;
+				++numReady;
+			}
+			else if (a.type == ActionType.unready && getClient(a.clientId).isReady)
+			{
+				getClient(a.clientId).isReady = false;
+				players = remove!(c => c == a.clientId)(players);
+				--numReady;
 			}
 		}
 	}
   
-	void start(const ref GameBoard board)
+	void deployShips(ref GameBoard board, const(ClientId[]) players)
 	{
 		// send board to all players
-	}
+		uint sectorNumber(uint hexX, uint hexY)
+		{
+			return hexX / 2 + (hexY / 3) * 3; // [0..9)
+		}
 
-	void setup()
-	{
-		//deploy ships
+		bool[9] occupiedSectors;
+
+		foreach(playerId; chain(players, players.retro))
+		{
+			while(true)
+			{
+				server.sendToAll(ClientTurnPacket(ClientTurn.deployShips, playerId));
+				Action a = waitForAction();
+				if (a.type == ActionType.deployShips && a.clientId == playerId)
+				{
+					auto packet = server.unpackPacket!DeployShipsPacket(a.packetData);
+					uint sector = sectorNumber(packet.x, packet.y);
+					
+					if (packet.x >= boardWidth || packet.y >= boardHeight) continue;
+					if (sector == 4 || sector >= 9) continue;
+					if (occupiedSectors[sector]) continue;
+					if (board[packet.x, packet.y].systemLevel != 1) continue;
+
+					occupiedSectors[sector] = true;
+
+					board[packet.x, packet.y].playerId = playerId;
+					board[packet.x, packet.y].numShips = 2;
+					break;
+				}
+			}
+		}
 	}
 
 	void rounds()

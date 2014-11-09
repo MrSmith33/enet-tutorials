@@ -41,6 +41,7 @@ class Server : BaseServer!Client
 		registerPacketHandler!LoginPacket(&handleLoginPacket);
 		registerPacketHandler!MessagePacket(&handleMessagePacket);
 		registerPacketHandler!ReadyPacket(&handleReadyPacket);
+		registerPacketHandler!DeployShipsPacket(&handleDeployShipsPacket);
 	}
 
 	override void update(uint msecs)
@@ -141,5 +142,10 @@ class Server : BaseServer!Client
 			actionQueue.insertBack(Action(ActionType.ready, clientId));
 		else
 			actionQueue.insertBack(Action(ActionType.unready, clientId));
+	}
+
+	void handleDeployShipsPacket(ubyte[] packetData, ClientId clientId)
+	{
+		actionQueue.insertBack(Action(ActionType.deployShips, clientId, packetData));
 	}
 }
