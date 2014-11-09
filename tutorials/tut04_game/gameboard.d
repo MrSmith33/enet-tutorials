@@ -25,8 +25,7 @@ bool isTriPrime(size_t x, size_t y)
 // 6 x 9
 struct GameBoard
 {
-	// 6
-	private Hex[54] data;
+	Hex[54] data;
 
 	ref Hex triPrime() @property
 	{
@@ -41,7 +40,8 @@ struct GameBoard
 	ref Hex opIndex(size_t x, size_t y)
 	{
 		// x < 6 on even row, x < 5 on odd row.
-		assert(x < boardWidth - (y % 2));
+		if (x >= boardWidth - (y % 2) || y >= boardHeight)
+			return data[11]; // unused hex
 
 		if (isTriPrime(x, y))
 			return triPrime;
@@ -52,7 +52,8 @@ struct GameBoard
 	ref Hex opIndexAssign(Hex newData, size_t x, size_t y)
 	{
 		// x < 6 on even row, x < 5 on odd row.
-		assert(x < boardWidth - (y % 2));
+		if (x >= boardWidth - (y % 2) || y >= boardHeight)
+			return data[11]; // unused hex
 
 		if (isTriPrime(x, y))
 			return triPrime = newData;
