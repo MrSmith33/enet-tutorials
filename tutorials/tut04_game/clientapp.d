@@ -10,7 +10,6 @@ import core.thread;
 import std.conv : to;
 import std.stdio : writefln, writeln;
 import std.string : format;
-import std.random : uniform;
 
 import derelict.enet.enet;
 
@@ -59,6 +58,8 @@ class Client : BaseClient
 		registerPacketHandler!MessagePacket(&handleMessagePacket);
 		registerPacketHandler!BoardDataPacket(&handleBoardDataPacket);
 		registerPacketHandler!ClientTurnPacket(&handleClientTurnPacket);
+		registerPacketHandler!DeployShipsArgsPacket(&handleDeployShipsArgsPacket);
+		registerPacketHandler!HexDataPacket(&handleHexDataPacket);
 	}
 
 	override void onConnect(ref ENetEvent event)
@@ -66,8 +67,9 @@ class Client : BaseClient
 		writefln("Connection to 127.0.0.1:1234 established");
 
 		// generate random name
+		import std.random : uniform;
 		myName = randomNames[uniform(0, randomNames.length)];
-		send(createPacket(LoginPacket(myName)));
+		send(LoginPacket(myName));
 	}
 
 	void handleSessionInfoPacket(ubyte[] packetData, ClientId peer)
@@ -77,10 +79,12 @@ class Client : BaseClient
 		clientNames = loginInfo.clientNames;
 		myId = loginInfo.yourId;
 
-		send(createPacket(ReadyPacket(true)));
-		send(createPacket(ReadyPacket(false)));
-		send(createPacket(ReadyPacket(true)));
-		send(createPacket(ReadyPacket(true)));
+		writefln("My id %s", myId);
+
+		send(ReadyPacket(true));
+		send(ReadyPacket(false));
+		send(ReadyPacket(true));
+		send(ReadyPacket(true));
 		flush();
 	}
 
@@ -130,14 +134,19 @@ class Client : BaseClient
 	void handleClientTurnPacket(ubyte[] packetData, ClientId peer)
 	{
 		auto packet = unpackPacket!ClientTurnPacket(packetData);
-		if (packet.id == myId)
+		if (packet.id == myId || packet.id == 0)
 		{
+			with(ClientTurn) 
 			final switch(packet.turn)
 			{
 				case deployShips:
-
 					break;
 				case plan:
+					writefln("on plan");
+					import std.random : randomShuffle;
+					Command[] commands = [Command.expand, Command.explore, Command.exterminate];
+					randomShuffle(commands);
+					send(PlanResultPacket(commands));
 					break;
 				case expand:
 					break;
@@ -149,6 +158,26 @@ class Client : BaseClient
 					break;
 			}
 		}
+	}
+
+	void handleDeployShipsArgsPacket(ubyte[] packetData, ClientId peer)
+	{
+		auto packet = unpackPacket!DeployShipsArgsPacket(packetData);
+		writefln("free sectors %s", packet.freeSectors);
+		HexCoords freeHex;
+		foreach(hexCoords; board.sectorHexes(cast(ubyte)packet.freeSectors[0]))
+			if (board[hexCoords.x, hexCoords.y].systemLevel == 1)
+			{
+				freeHex = hexCoords;
+				break;
+			}
+		send(DeployShipsResultPacket(freeHex.x, freeHex.y));
+	}
+
+	void handleHexDataPacket(ubyte[] packetData, ClientId peer)
+	{
+		auto packet = unpackPacket!HexDataPacket(packetData);
+		writeln(packet);
 	}
 }
 

@@ -26,6 +26,7 @@ enum ActionType
 	// - no packet data, + with packet data
 	/*-*/ ready,
 	/*-*/ unready,
+	/*+*/ plan,
 	/*-*/ deployShips
 }
 
@@ -69,22 +70,28 @@ class ServerLogicFiber : Fiber
 
 	// LOGIC
 
+	GameBoard board;
+	ClientId[] players;
+
+	void rotatePlayers()
+	{
+		import std.algorithm : bringToFront;
+		bringToFront(players[0..1], players[1..$]);
+	}
+
 	void run()
 	{
-		GameBoard board;
-		ClientId[] players;
-
-		waitForReady(players);
-		writeln(players);
+		waitForReady();
 		board = boardGen();
 		BoardDataPacket packet;
+		packet.systemLevels = new uint[54];
 		foreach(i, hex; board.data)
 			packet.systemLevels[i] = hex.systemLevel;
-		server.sendToAll(server.createPacket(packet));
+		server.sendToAll(packet);
 
-		deployShips(board, players);
-		server.isRunning = false;
+		deployShips();
 		rounds();
+		server.isRunning = false;
 		endGame();
 	}
 
@@ -158,7 +165,7 @@ class ServerLogicFiber : Fiber
 		return board;
 	}
 
-	void waitForReady(ref ClientId[] players)
+	void waitForReady()
 	{
 		int numReady;
 		while (numReady < 3)
@@ -180,37 +187,45 @@ class ServerLogicFiber : Fiber
 		}
 	}
   
-	void deployShips(ref GameBoard board, const(ClientId[]) players)
+	void deployShips()
 	{
-		// send board to all players
-		uint sectorNumber(uint hexX, uint hexY)
-		{
-			return hexX / 2 + (hexY / 3) * 3; // [0..9)
-		}
-
 		bool[9] occupiedSectors;
+		occupiedSectors[4] = true;
 
 		foreach(playerId; chain(players, players.retro))
 		{
-			while(true)
+			server.sendToAllExcept(playerId, ClientTurnPacket(ClientTurn.deployShips, playerId));
+
+			outerLoop:
+			while(true) // Wait for valid action result
 			{
-				server.sendToAll(ClientTurnPacket(ClientTurn.deployShips, playerId));
-				Action a = waitForAction();
-				if (a.type == ActionType.deployShips && a.clientId == playerId)
+				uint[] freeSectors;
+				foreach (i, s; occupiedSectors)
+					if (!s) freeSectors ~= i;
+				server.sendTo(playerId, DeployShipsArgsPacket(freeSectors));
+
+				while(true) // Wait for deployShips action
 				{
-					auto packet = server.unpackPacket!DeployShipsPacket(a.packetData);
-					uint sector = sectorNumber(packet.x, packet.y);
-					
-					if (packet.x >= boardWidth || packet.y >= boardHeight) continue;
-					if (sector == 4 || sector >= 9) continue;
-					if (occupiedSectors[sector]) continue;
-					if (board[packet.x, packet.y].systemLevel != 1) continue;
+					Action action = waitForAction();
+					writefln("%s", action.type);
+					if (action.type == ActionType.deployShips && action.clientId == playerId)
+					{
+						auto packet = server.unpackPacket!DeployShipsResultPacket(action.packetData);
+						uint sector = sectorNumber(HexCoords(cast(ubyte)packet.x, cast(ubyte)packet.y));
+						
+						if (packet.x >= boardWidth || packet.y >= boardHeight) continue outerLoop;
+						if (sector == 4 || sector >= 9) continue outerLoop;
+						if (occupiedSectors[sector]) continue outerLoop;
+						if (board[packet.x, packet.y].systemLevel != 1) continue outerLoop;
 
-					occupiedSectors[sector] = true;
+						occupiedSectors[sector] = true;
 
-					board[packet.x, packet.y].playerId = playerId;
-					board[packet.x, packet.y].numShips = 2;
-					break;
+						board[packet.x, packet.y].playerId = playerId;
+						board[packet.x, packet.y].numShips = 2;
+
+						server.sendToAll(HexDataPacket(packet.x, packet.y, playerId, 2));
+						break outerLoop;
+					}
 				}
 			}
 		}
@@ -224,26 +239,44 @@ class ServerLogicFiber : Fiber
 
 	void round()
 	{
+		writeln("Plan");
 		plan();
+		writeln("Perform");
+
+		server.isRunning = false;
 		perform();
 		exploit();
-		//rotatePlayers();
+		rotatePlayers();
 	}
 
 	// phase 1
 	void plan()
 	{
-		//foreach(ref p; players)
-		//	p.hasPlan = false;
-		//uint numPlayersDonePlan;
-		//while(numPlayersDonePlan < players.length)
-		//{
-		//	uint pid;
-		//	PlanAction action = waitForAction!PlanAction(pid);
-		//	if (players[pid].hasPlan) continue;
-		//	players[pid].hasPlan = true;
-		//	players[pid].commands = action.commands;
-		//}
+		server.sendToAll(ClientTurnPacket(ClientTurn.plan, 0));
+
+		uint numPlayersDonePlan;
+		while(numPlayersDonePlan < players.length)
+		{
+			Action action = waitForAction();
+
+			if (action.type != ActionType.plan) continue; // reject not valid action.
+			if (getClient(action.clientId).commands.length != 0) continue; // reject, commands already set.
+
+			auto packet = server.unpackPacket!PlanResultPacket(action.packetData);
+
+			if (packet.commands.length != 3) // Invalid result.
+			{
+				server.sendTo(action.clientId, ClientTurnPacket(ClientTurn.plan, 0));
+				continue;
+			}
+
+			getClient(action.clientId).commands = packet.commands;
+
+			++numPlayersDonePlan;
+		}
+
+		foreach(pid; players)
+			writeln(getClient(pid).commands);
 	}
 
 	// phase 2

@@ -22,11 +22,12 @@ void registerPackets(Connection c)
 	c.registerPacket!ClientTurnPacket;
 	c.registerPacket!BoardDataPacket;
 	c.registerPacket!HexDataPacket;
+	c.registerPacket!DeployShipsArgsPacket;
 
 	// Client -> Server
 	c.registerPacket!ReadyPacket;
-	c.registerPacket!DeployShipsPacket;
-	c.registerPacket!PlanPacket;
+	c.registerPacket!DeployShipsResultPacket;
+	c.registerPacket!PlanResultPacket;
 	c.registerPacket!EndTurnPacket;
 }
 
@@ -70,22 +71,21 @@ struct ReadyPacket
 
 struct BoardDataPacket
 {
-	uint[54] systemLevels;
+	uint[] systemLevels;
 }
 
 struct HexDataPacket
 {
-	uint hexId;
+	uint x;
+	uint y;
 	size_t playerId;
 	uint numShips;
 }
 
-struct EndTurnPacket{}
-
 enum ClientTurn
 {
 	deployShips,
-	plan,
+	plan, // for all players, playerId == 0
 	expand,
 	explore,
 	exterminate,
@@ -99,15 +99,20 @@ struct ClientTurnPacket
 	ClientId id; // Who makes turn.
 }
 
-struct DeployShipsPacket
+struct DeployShipsArgsPacket
+{
+	uint[] freeSectors;
+}
+
+struct DeployShipsResultPacket
 {
 	// hex coords of level I hex in unoccupied system.
 	uint x, y;
 }
 
-struct PlanPacket
+struct PlanResultPacket
 {
-	Command[3] commands;
+	Command[] commands;
 }
 
 struct ExpandPacket
@@ -121,3 +126,5 @@ struct ExplorePacket
 	// hex coords of occupied hex.
 	uint x, y;
 }
+
+struct EndTurnPacket{}

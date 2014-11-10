@@ -13,6 +13,7 @@ struct Client
 	bool isReady;
 	string name;
 	ENetPeer* peer;
+	Command[] commands;
 }
 
 class Server : BaseServer!Client
@@ -41,7 +42,8 @@ class Server : BaseServer!Client
 		registerPacketHandler!LoginPacket(&handleLoginPacket);
 		registerPacketHandler!MessagePacket(&handleMessagePacket);
 		registerPacketHandler!ReadyPacket(&handleReadyPacket);
-		registerPacketHandler!DeployShipsPacket(&handleDeployShipsPacket);
+		registerPacketHandler!DeployShipsResultPacket(&handleDeployShipsResultPacket);
+		registerPacketHandler!PlanResultPacket(&handlePlanResultPacket);
 	}
 
 	override void update(uint msecs)
@@ -51,19 +53,19 @@ class Server : BaseServer!Client
 			logic.call();
 	}
 
-	void sendMessageTo(ClientId userId, string message)
+	void sendMessageTo(ClientId clientId, string message)
 	{
-		sendTo(only(userId), createPacket(MessagePacket(0, message)));
+		sendTo(only(clientId), createPacket(MessagePacket(0, message)));
 	}
 
-	void handleCommand(string command, ClientId userId)
+	void handleCommand(string command, ClientId clientId)
 	{
 		import std.algorithm : splitter;
 		import std.string : format;
 		
 		if (command.length <= 1)
 		{
-			sendMessageTo(userId, "Invalid command");
+			sendMessageTo(clientId, "Invalid command");
 			return;
 		}
 
@@ -78,7 +80,7 @@ class Server : BaseServer!Client
 			disconnectAll();
 		}
 		else
-			sendMessageTo(userId, format("Unknown command %s", commName));
+			sendMessageTo(clientId, format("Unknown command %s", commName));
 	}
 
 	override void onConnect(ref ENetEvent event)
@@ -144,8 +146,13 @@ class Server : BaseServer!Client
 			actionQueue.insertBack(Action(ActionType.unready, clientId));
 	}
 
-	void handleDeployShipsPacket(ubyte[] packetData, ClientId clientId)
+	void handleDeployShipsResultPacket(ubyte[] packetData, ClientId clientId)
 	{
 		actionQueue.insertBack(Action(ActionType.deployShips, clientId, packetData));
+	}
+
+	void handlePlanResultPacket(ubyte[] packetData, ClientId clientId)
+	{
+		actionQueue.insertBack(Action(ActionType.plan, clientId, packetData));
 	}
 }

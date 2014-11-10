@@ -22,6 +22,22 @@ bool isTriPrime(size_t x, size_t y)
 		(y == 5 && x == 2);
 }
 
+struct HexCoords
+{
+	ubyte x;
+	ubyte y;
+}
+
+uint sectorNumber(HexCoords hexCoords)
+{
+	return hexCoords.x / 2 + (hexCoords.y / 3) * 3; // [0..9)
+}
+
+HexCoords hexCoordsFromIndex(ubyte index) // [0..54)
+{
+	return HexCoords(index % boardWidth, index / boardWidth);
+}
+
 // 6 x 9
 struct GameBoard
 {
@@ -59,5 +75,17 @@ struct GameBoard
 			return triPrime = newData;
 
 		return data[x + y * boardWidth] = newData;
+	}
+
+	auto sectorHexes(ubyte sectorId) // 0-8
+	{
+		HexCoords[] sectors;
+		foreach(ubyte index, hex; data)
+		{
+			HexCoords coords = hexCoordsFromIndex(index);
+			if (sectorNumber(coords) == sectorId)
+				sectors ~= coords;
+		}
+		return sectors;
 	}
 }
