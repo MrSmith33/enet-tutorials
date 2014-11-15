@@ -83,6 +83,7 @@ class ServerLogicFiber : Fiber
 	{
 		waitForReady();
 		board = boardGen();
+
 		BoardDataPacket packet;
 		packet.systemLevels = new uint[54];
 		foreach(i, hex; board.data)
@@ -90,8 +91,8 @@ class ServerLogicFiber : Fiber
 		server.sendToAll(packet);
 
 		deployShips();
-		rounds();
 		server.isRunning = false;
+		rounds();
 		endGame();
 	}
 
@@ -186,6 +187,47 @@ class ServerLogicFiber : Fiber
 			}
 		}
 	}
+
+	void deployShip(ClientId playerId, bool[] occupiedSectors)
+	{
+		uint[] freeSectors;
+		foreach (i, s; occupiedSectors)
+			if (!s) freeSectors ~= i;
+
+		bool isValidAction(Action a)
+		{
+			return a.type == ActionType.deployShips && a.clientId == playerId;
+		}
+
+		while(true) // Wait for deployShips action
+		{
+			server.sendTo(playerId, DeployShipsArgsPacket(freeSectors));
+
+			Action action;
+			do
+			{
+				action = waitForAction();
+				writefln("%s", action.type);
+			}
+			while (!isValidAction(action));
+
+			auto packet = server.unpackPacket!DeployShipsResultPacket(action.packetData);
+			uint sector = sectorNumber(HexCoords(cast(ubyte)packet.x, cast(ubyte)packet.y));
+			
+			if (packet.x >= boardWidth || packet.y >= boardHeight) continue;
+			if (sector == 4 || sector >= 9) continue;
+			if (occupiedSectors[sector]) continue;
+			if (board[packet.x, packet.y].systemLevel != 1) continue;
+
+			occupiedSectors[sector] = true;
+
+			board[packet.x, packet.y].playerId = playerId;
+			board[packet.x, packet.y].numShips = 2;
+
+			server.sendToAll(HexDataPacket(packet.x, packet.y, playerId, 2));
+			break;
+		}
+	}
   
 	void deployShips()
 	{
@@ -194,40 +236,8 @@ class ServerLogicFiber : Fiber
 
 		foreach(playerId; chain(players, players.retro))
 		{
-			server.sendToAllExcept(playerId, ClientTurnPacket(ClientTurn.deployShips, playerId));
-
-			outerLoop:
-			while(true) // Wait for valid action result
-			{
-				uint[] freeSectors;
-				foreach (i, s; occupiedSectors)
-					if (!s) freeSectors ~= i;
-				server.sendTo(playerId, DeployShipsArgsPacket(freeSectors));
-
-				while(true) // Wait for deployShips action
-				{
-					Action action = waitForAction();
-					writefln("%s", action.type);
-					if (action.type == ActionType.deployShips && action.clientId == playerId)
-					{
-						auto packet = server.unpackPacket!DeployShipsResultPacket(action.packetData);
-						uint sector = sectorNumber(HexCoords(cast(ubyte)packet.x, cast(ubyte)packet.y));
-						
-						if (packet.x >= boardWidth || packet.y >= boardHeight) continue outerLoop;
-						if (sector == 4 || sector >= 9) continue outerLoop;
-						if (occupiedSectors[sector]) continue outerLoop;
-						if (board[packet.x, packet.y].systemLevel != 1) continue outerLoop;
-
-						occupiedSectors[sector] = true;
-
-						board[packet.x, packet.y].playerId = playerId;
-						board[packet.x, packet.y].numShips = 2;
-
-						server.sendToAll(HexDataPacket(packet.x, packet.y, playerId, 2));
-						break outerLoop;
-					}
-				}
-			}
+			server.sendToAll(ClientTurnPacket(ClientTurn.deployShips, playerId));
+			deployShip(playerId, occupiedSectors);
 		}
 	}
 
