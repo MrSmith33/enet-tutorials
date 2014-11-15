@@ -1,10 +1,8 @@
 module serverlogic;
 
-import std.algorithm : canFind, remove;
-import std.stdio;
-import std.container : DList, SList;
-import std.range;
 import core.thread : Fiber;
+import std.stdio : writeln, writefln;
+import std.container : DList;
 
 import connection;
 import server;
@@ -15,9 +13,8 @@ import gameboard;
 struct Player
 {
 	ClientId clientId;
-	bool hasPlan;
 
-	uint numberOfShips;
+	uint numShips;
 	uint score;
 }
 
@@ -37,6 +34,16 @@ struct Action
 	ubyte[] packetData;
 }
 
+import std.range : isInputRange;
+auto getPopFront(IR)(ref IR inputRange)
+	if (isInputRange!IR)
+{
+	import std.range : front, popFront;
+	auto frontItem = inputRange.front;
+	inputRange.popFront();
+	return frontItem;
+}
+
 class ServerLogicFiber : Fiber
 {
 	DList!Action* queue;
@@ -44,7 +51,6 @@ class ServerLogicFiber : Fiber
 
 	Action waitForAction()
 	{
-		import std.range : moveFront;
 		while (queue.empty)
 		{
 			Fiber.yield();
@@ -72,6 +78,7 @@ class ServerLogicFiber : Fiber
 
 	GameBoard board;
 	ClientId[] players;
+	ClientId triPrimeOwner; // 0 if none
 
 	void rotatePlayers()
 	{
@@ -91,9 +98,9 @@ class ServerLogicFiber : Fiber
 		server.sendToAll(packet);
 
 		deployShips();
-		server.isRunning = false;
 		rounds();
 		endGame();
+		server.isRunning = false;
 	}
 
 	GameBoard boardGen()
@@ -169,6 +176,7 @@ class ServerLogicFiber : Fiber
 	void waitForReady()
 	{
 		int numReady;
+
 		while (numReady < 3)
 		{
 			Action a = waitForAction();
@@ -181,6 +189,7 @@ class ServerLogicFiber : Fiber
 			}
 			else if (a.type == ActionType.unready && getClient(a.clientId).isReady)
 			{
+				import std.algorithm : remove;
 				getClient(a.clientId).isReady = false;
 				players = remove!(c => c == a.clientId)(players);
 				--numReady;
@@ -207,7 +216,7 @@ class ServerLogicFiber : Fiber
 			do
 			{
 				action = waitForAction();
-				writefln("%s", action.type);
+				writefln("%s %s", playerId, action.type);
 			}
 			while (!isValidAction(action));
 
@@ -223,6 +232,7 @@ class ServerLogicFiber : Fiber
 
 			board[packet.x, packet.y].playerId = playerId;
 			board[packet.x, packet.y].numShips = 2;
+			getClient(playerId).numShips += 2;
 
 			server.sendToAll(HexDataPacket(packet.x, packet.y, playerId, 2));
 			break;
@@ -231,6 +241,8 @@ class ServerLogicFiber : Fiber
   
 	void deployShips()
 	{
+		import std.range : chain, retro;
+
 		bool[9] occupiedSectors;
 		occupiedSectors[4] = true;
 
@@ -251,11 +263,12 @@ class ServerLogicFiber : Fiber
 	{
 		writeln("Plan");
 		plan();
-		writeln("Perform");
 
-		server.isRunning = false;
+		writeln("Perform");
 		perform();
+
 		exploit();
+
 		rotatePlayers();
 	}
 
@@ -286,44 +299,107 @@ class ServerLogicFiber : Fiber
 		}
 
 		foreach(pid; players)
-			writeln(getClient(pid).commands);
+			writefln("%s %(%s -> %)", pid, getClient(pid).commands);
+	}
+
+	static struct PlayerCommand
+	{
+		Command command;
+		ClientId playerId;
+		uint numTurns; // 1-3
 	}
 
 	// phase 2
 	void perform()
 	{
+		import std.algorithm : count, sort, SwapStrategy;
+		import std.range : moveFront;
 
+		foreach(_; 0..3)
+		{
+			// Get first command of all players.
+			PlayerCommand[] playerCommands;
+			foreach(player; players)
+			{
+				playerCommands ~= PlayerCommand(getClient(player).commands.getPopFront, player);
+			}
+
+			sort!("a.command < b.command", SwapStrategy.stable)(playerCommands);
+			foreach(ref command; playerCommands)
+			{
+				command.numTurns = 4 - count!((a, b) => a.command == b.command)(playerCommands, command);
+			}
+
+			foreach(playerCommand; playerCommands)
+			foreach(__; 0..playerCommand.numTurns)
+			final switch(playerCommand.command)
+			{
+				case Command.expand:
+					expand(playerCommand.playerId);
+					break;
+				case Command.explore:
+					explore(playerCommand.playerId);
+					break;
+				case Command.exterminate:
+					exterminate(playerCommand.playerId);
+					break;
+			}
+		}
 	}
 
-	void expand()
+	void expand(ClientId playerId)
 	{
-
+		writefln("expand %s", playerId);
+		return;
+		//server.sendToAll(ClientTurnPacket(ClientTurn.expand, playerId));
 	}
 
-	void explore()
+	void explore(ClientId playerId)
 	{
-
+		writefln("explore %s", playerId);
+		return;
+		//server.sendToAll(ClientTurnPacket(ClientTurn.explore, playerId));
 	}
 
-	void exterminate()
+	void exterminate(ClientId playerId)
 	{
-
+		writefln("exterminate %s", playerId);
+		return;
+		//server.sendToAll(ClientTurnPacket(ClientTurn.exterminate, playerId));
 	}
 
 	// phase 3
 	void exploit()
 	{
+		sustainShips();
+	}
 
+	void sustainShips()
+	{
+		foreach(hex; board.data)
+		{
+			if (hex.numShips > hex.systemLevel + 1)
+			{
+				hex.numShips = hex.systemLevel + 1;
+			}
+		}
 	}
 
 	void endGame()
 	{
+		import std.algorithm : sort;
 
+		uint maxScorePlayer, maxScore;
+
+		foreach(p; players)
+		{
+			if (getClient(p).score > maxScore)
+			{
+				maxScorePlayer = p;
+				maxScore = getClient(p).score;
+			}
+		}
+
+		writefln("%s won with %s points", maxScorePlayer, maxScore);
 	}
-}
-
-unittest
-{
-	DList!Action actionList;
-	auto serverLogic = new ServerLogicFiber(&actionList);
 }

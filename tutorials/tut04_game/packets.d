@@ -84,11 +84,13 @@ struct HexDataPacket
 
 enum ClientTurn
 {
-	deployShips,
-	plan, // for all players, playerId == 0
+	// matches Command enum
 	expand,
 	explore,
 	exterminate,
+
+	deployShips,
+	plan, // for all players, playerId == 0
 	chooseScoreSector,
 
 }
